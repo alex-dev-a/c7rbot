@@ -19,7 +19,13 @@ module.exports = {
     .addSubcommand(sub => sub.setName('ticketpoints').setDescription('نقاط استلام كل تذكرة')
       .addIntegerOption(opt => opt.setName('amount').setDescription('عدد النقاط').setRequired(true)))
     .addSubcommand(sub => sub.setName('dutypoints').setDescription('نقاط كل ساعة مناوبة')
-      .addIntegerOption(opt => opt.setName('amount').setDescription('عدد النقاط').setRequired(true))),
+      .addIntegerOption(opt => opt.setName('amount').setDescription('عدد النقاط').setRequired(true)))
+    .addSubcommand(sub => sub.setName('textpoints').setDescription('نقاط الرسائل الكتابية (العدد وفترة الانتظار)')
+      .addIntegerOption(opt => opt.setName('points').setDescription('عدد النقاط لكل رسالة').setRequired(true))
+      .addIntegerOption(opt => opt.setName('cooldown_seconds').setDescription('فترة الانتظار بالثواني بين كل رسالة تُحتسب والثانية').setRequired(true)))
+    .addSubcommand(sub => sub.setName('voicepoints').setDescription('نقاط التواجد الصوتي (العدد وكل كم دقيقة)')
+      .addIntegerOption(opt => opt.setName('points').setDescription('عدد النقاط لكل فترة').setRequired(true))
+      .addIntegerOption(opt => opt.setName('interval_minutes').setDescription('كل كم دقيقة تُحتسب النقاط').setRequired(true))),
   async execute(interaction) {
     const db = readDb();
     const sub = interaction.options.getSubcommand();
@@ -38,6 +44,12 @@ module.exports = {
       db.settings.ticketClaimPoints = interaction.options.getInteger('amount');
     } else if (sub === 'dutypoints') {
       db.settings.dutyPointsPerHour = interaction.options.getInteger('amount');
+    } else if (sub === 'textpoints') {
+      db.settings.textPointsPerMessage = interaction.options.getInteger('points');
+      db.settings.textCooldownSeconds = interaction.options.getInteger('cooldown_seconds');
+    } else if (sub === 'voicepoints') {
+      db.settings.voicePointsPerInterval = interaction.options.getInteger('points');
+      db.settings.voiceIntervalMinutes = interaction.options.getInteger('interval_minutes');
     }
     writeDb(db);
     await interaction.reply({ content: '✅ تم تحديث الإعدادات بنجاح.', ephemeral: true });
