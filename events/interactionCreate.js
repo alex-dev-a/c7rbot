@@ -8,7 +8,6 @@ const { sendLog } = require('../utils/logger');
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction, client) {
-    // ── Slash commands ──────────────────────────────
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
@@ -23,7 +22,6 @@ module.exports = {
       return;
     }
 
-    // ── Buttons ──────────────────────────────────────
     if (interaction.isButton()) {
       const db = readDb();
 
@@ -102,10 +100,45 @@ module.exports = {
 
       if (interaction.customId.startsWith('apply_accept_') || interaction.customId.startsWith('apply_deny_')) {
         const isAccept = interaction.customId.startsWith('apply_accept_');
-        const targetId = interaction.customId.split('_')[2];
-        await interaction.reply({ content: `تم ${isAccept ? 'قبول' : 'رفض'} الطلب من قبل <@${interaction.user.id}>.` });
-        sendLog(client, isAccept ? '✅ قبول تقديم' : '❌ رفض تقديم', `طلب <@${targetId}> تمت مراجعته (${isAccept ? 'قبول' : 'رفض'}) بواسطة <@${interaction.user.id}>.`);
-        const user = await client.users.fetch(targetId).catch(() => null);
+        const prefix = isAccept ? 'apply_accept_' : 'apply_deny_';
+        const appId = interaction.customId.slice(prefix.length);
+
+        const app = db.applications[appId];
+        if (!app) {
+          return interaction.reply({ content: '⚠️ لم يُعثر على بيانات هذا الطلب.', ephemeral: true });
+        }
+        if (app.status !== 'pending') {
+          const statusText = app.status === 'accepted' ? 'مقبول' : 'مرفوض';
+          return interaction.reply({
+            content: `⚠️ تمت معالجة هذا الطلب مسبقاً من قبل <@${app.decidedBy}> (${statusText}). لا يمكن تعديله مرة أخرى.`,
+            ephemeral: true
+          });
+        }
+
+        app.status = isAccept ? 'accepted' : 'rejected';
+        app.decidedBy = interaction.user.id;
+        app.decidedAt = Date.now();
+        writeDb(db);
+
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('apply_accept_done').setLabel('قبول').setStyle(ButtonStyle.Success).setDisabled(true),
+          new ButtonBuilder().setCustomId('apply_deny_done').setLabel('رفض').setStyle(ButtonStyle.Danger).setDisabled(true)
+        );
+        const originalEmbed = interaction.message.embeds[0];
+        const updatedEmbed = originalEmbed
+          ? EmbedBuilder.from(originalEmbed).addFields({
+              name: 'الحالة',
+              value: `${isAccept ? '✅ مقبول' : '❌ مرفوض'} بواسطة <@${interaction.user.id}>`
+            })
+          : null;
+
+        await interaction.update({
+          embeds: updatedEmbed ? [updatedEmbed] : undefined,
+          components: [disabledRow]
+        });
+
+        sendLog(client, isAccept ? '✅ قبول تقديم' : '❌ رفض تقديم', `طلب <@${app.userId}> تمت مراجعته (${isAccept ? 'قبول' : 'رفض'}) بواسطة <@${interaction.user.id}>.`);
+        const user = await client.users.fetch(app.userId).catch(() => null);
         if (user) {
           user.send(isAccept
             ? '🎉 تم قبول طلب تقديمك في فريق إدارة C7R! تواصل مع الإدارة للخطوات التالية.'
@@ -116,7 +149,6 @@ module.exports = {
       }
     }
 
-    // ── Modals ───────────────────────────────────────
     if (interaction.isModalSubmit()) {
       if (interaction.customId === 'apply_modal') {
         const name = interaction.fields.getTextInputValue('apply_name');
@@ -129,6 +161,11 @@ module.exports = {
           return interaction.reply({ content: '⚠️ لم يتم إعداد قناة مراجعة الطلبات بعد. أخبر الإدارة.', ephemeral: true });
         }
         const channel = await client.channels.fetch(reviewChannelId).catch(() => null);
+
+        const appId = `${interaction.user.id}_${Date.now()}`;
+        db.applications[appId] = { userId: interaction.user.id, status: 'pending' };
+        writeDb(db);
+
         if (channel) {
           const embed = new EmbedBuilder()
             .setColor(0xA855F7)
@@ -142,8 +179,8 @@ module.exports = {
             )
             .setTimestamp();
           const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`apply_accept_${interaction.user.id}`).setLabel('قبول').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`apply_deny_${interaction.user.id}`).setLabel('رفض').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId(`apply_accept_${appId}`).setLabel('قبول').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`apply_deny_${appId}`).setLabel('رفض').setStyle(ButtonStyle.Danger)
           );
           channel.send({ embeds: [embed], components: [row] });
         }
