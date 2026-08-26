@@ -16,18 +16,33 @@ function ensureDb() {
         staffRoleId: null,
         ticketBotIds: [],
         ticketClaimPoints: 5,
-        dutyPointsPerHour: 2
+        dutyPointsPerHour: 2,
+        textPointsPerMessage: 1,
+        textCooldownSeconds: 60,
+        voicePointsPerInterval: 1,
+        voiceIntervalMinutes: 10
       },
       claimedMessages: [],
       activeSessions: {},
-      activeTickets: {}
+      activeTickets: {},
+      voiceSessions: {},
+      lastTextPoint: {},
+      applications: {}
     }, null, 2));
   }
 }
 
 function readDb() {
   ensureDb();
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  if (!db.settings.textPointsPerMessage) db.settings.textPointsPerMessage = 1;
+  if (!db.settings.textCooldownSeconds) db.settings.textCooldownSeconds = 60;
+  if (!db.settings.voicePointsPerInterval) db.settings.voicePointsPerInterval = 1;
+  if (!db.settings.voiceIntervalMinutes) db.settings.voiceIntervalMinutes = 10;
+  if (!db.voiceSessions) db.voiceSessions = {};
+  if (!db.lastTextPoint) db.lastTextPoint = {};
+  if (!db.applications) db.applications = {};
+  return db;
 }
 
 function writeDb(data) {
@@ -36,8 +51,17 @@ function writeDb(data) {
 
 function getStaff(db, userId) {
   if (!db.staff[userId]) {
-    db.staff[userId] = { points: 0, ticketsHandled: 0, dutySeconds: 0, reports: 0 };
+    db.staff[userId] = {
+      points: 0,
+      ticketsHandled: 0,
+      dutySeconds: 0,
+      reports: 0,
+      voiceSeconds: 0,
+      textMessages: 0
+    };
   }
+  if (db.staff[userId].voiceSeconds === undefined) db.staff[userId].voiceSeconds = 0;
+  if (db.staff[userId].textMessages === undefined) db.staff[userId].textMessages = 0;
   return db.staff[userId];
 }
 
