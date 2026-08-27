@@ -1,26 +1,37 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { REST, Routes } = require('discord.js');
 
-const commands = [];
-const commandsPath = path.join(__dirname, 'commands');
-for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'))) {
-  const command = require(path.join(commandsPath, file));
-  commands.push(command.data.toJSON());
-}
+const commands = JSON.parse(fs.readFileSync(path.join(__dirname, 'commands-static.json'), 'utf8'));
 
-const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+const token = process.env.DISCORD_TOKEN;
+const clientId = process.env.CLIENT_ID;
+const guildId = process.env.GUILD_ID;
 
 (async () => {
   try {
-    console.log(`⏳ تسجيل ${commands.length} أمر...`);
-    await rest.put(
-      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-      { body: commands }
+    console.log(`⏳ تسجيل ${commands.length} أمر (نسخة خفيفة)...`);
+    const res = await fetch(
+      `https://discord.com/api/v10/applications/${clientId}/guilds/${guildId}/commands`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bot ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(commands)
+      }
     );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`❌ فشل تسجيل الأوامر (${res.status}):`, errText);
+      process.exit(1);
+    }
+
     console.log('✅ تم تسجيل الأوامر بنجاح.');
   } catch (err) {
-    console.error(err);
+    console.error('❌ خطأ أثناء تسجيل الأوامر:', err);
+    process.exit(1);
   }
 })();
