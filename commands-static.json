@@ -1,0 +1,148 @@
+[
+  {
+    "name": "config",
+    "description": "إعداد بوت C7R (للإدارة العليا فقط)",
+    "default_member_permissions": "8",
+    "options": [
+      {
+        "type": 1,
+        "name": "logchannel",
+        "description": "تحديد قناة سجلات الإدارة",
+        "options": [
+          { "type": 7, "name": "channel", "description": "القناة", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "messagelogchannel",
+        "description": "تحديد قناة سجلات الرسائل",
+        "options": [
+          { "type": 7, "name": "channel", "description": "القناة", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "reviewchannel",
+        "description": "تحديد قناة مراجعة طلبات التقديم",
+        "options": [
+          { "type": 7, "name": "channel", "description": "القناة", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "staffrole",
+        "description": "تحديد رتبة الإدارة",
+        "options": [
+          { "type": 8, "name": "role", "description": "الرتبة", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "addticketbot",
+        "description": "إضافة آيدي بوت تذاكر خارجي لمراقبته",
+        "options": [
+          { "type": 3, "name": "botid", "description": "آيدي البوت", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "ticketpoints",
+        "description": "نقاط استلام كل تذكرة",
+        "options": [
+          { "type": 4, "name": "amount", "description": "عدد النقاط", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "dutypoints",
+        "description": "نقاط كل ساعة مناوبة",
+        "options": [
+          { "type": 4, "name": "amount", "description": "عدد النقاط", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "textpoints",
+        "description": "نقاط الرسائل الكتابية (العدد وفترة الانتظار)",
+        "options": [
+          { "type": 4, "name": "points", "description": "عدد النقاط لكل رسالة", "required": true },
+          { "type": 4, "name": "cooldown_seconds", "description": "فترة الانتظار بالثواني بين كل رسالة تُحتسب والثانية", "required": true }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "voicepoints",
+        "description": "نقاط التواجد الصوتي (العدد وكل كم دقيقة)",
+        "options": [
+          { "type": 4, "name": "points", "description": "عدد النقاط لكل فترة", "required": true },
+          { "type": 4, "name": "interval_minutes", "description": "كل كم دقيقة تُحتسب النقاط", "required": true }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "لوحة-المناوبة",
+    "description": "نشر لوحة تسجيل المناوبة (دخول/خروج)",
+    "default_member_permissions": "32"
+  },
+  {
+    "name": "لوحة-المهام",
+    "description": "نشر لوحة استلام وإنهاء المهام داخل هذه القناة",
+    "default_member_permissions": "32"
+  },
+  {
+    "name": "لوحة-التقديم",
+    "description": "نشر لوحة التقديم على فريق الإدارة",
+    "default_member_permissions": "32"
+  },
+  {
+    "name": "تقرير",
+    "description": "إرسال تقرير إداري"
+  },
+  {
+    "name": "نقاطي",
+    "description": "عرض نقاطك أو نقاط عضو آخر",
+    "options": [
+      { "type": 6, "name": "عضو", "description": "العضو", "required": false }
+    ]
+  },
+  {
+    "name": "المتصدرين",
+    "description": "عرض أفضل 10 أعضاء إدارة حسب النقاط"
+  },
+  {
+    "name": "إضافة-نقاط",
+    "description": "إضافة نقاط يدوياً لعضو إدارة",
+    "default_member_permissions": "32",
+    "options": [
+      { "type": 6, "name": "عضو", "description": "العضو", "required": true },
+      { "type": 4, "name": "عدد", "description": "عدد النقاط", "required": true }
+    ]
+  },
+  {
+    "name": "خصم-نقاط",
+    "description": "خصم نقاط يدوياً من عضو إدارة",
+    "default_member_permissions": "32",
+    "options": [
+      { "type": 6, "name": "عضو", "description": "العضو", "required": true },
+      { "type": 4, "name": "عدد", "description": "عدد النقاط", "required": true }
+    ]
+  },
+  {
+    "name": "استلام-تذكرة",
+    "description": "تسجيل استلامك لتذكرة (يُستخدم مع بوتات التذاكر الخارجية)"
+  },
+  {
+    "name": "قائمة-الإدارة",
+    "description": "عرض قائمة كاملة بكل أعضاء الإدارة وتفاصيل نقاطهم"
+  },
+  {
+    "name": "ارسال-خاص",
+    "description": "إرسال رسالة خاصة لعضو عبر البوت",
+    "default_member_permissions": "32",
+    "options": [
+      { "type": 6, "name": "عضو", "description": "العضو المستقبل", "required": true },
+      { "type": 3, "name": "رسالة", "description": "نص الرسالة", "required": true }
+    ]
+  }
+]
