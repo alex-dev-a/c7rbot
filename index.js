@@ -3,15 +3,26 @@ const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 
+// شبكة أمان عامة: أي خطأ غير متوقع بأي مكان بالبوت يُسجَّل فقط
+// ولا يوقف العملية بالكامل. هذا يمنع انهيار البوت المفاجئ الذي
+// يحتاج إعادة تشغيل يدوية بعد كل خطأ صغير.
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ خطأ غير معالج (unhandledRejection):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ خطأ غير متوقع (uncaughtException):', err);
+});
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildModeration
+    GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildVoiceStates
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember]
 });
 
 client.commands = new Collection();
