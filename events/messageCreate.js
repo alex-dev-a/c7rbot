@@ -1,10 +1,5 @@
-const { readDb, writeDb, getStaff } = require('../utils/db');
-const { sendLog } = require('../utils/logger');
+const { readDb, writeDb, getStaff, logPointEvent } = require('../utils/db');
 
-// يراقب رسائل بوتات التذاكر الخارجية المحددة عبر /config addticketbot
-// ويحاول رصد كلمة "استلام" أو "claimed" مع منشن لعضو ليحتسب له النقاط تلقائياً.
-// هذه الطريقة تعتمد على صياغة رسائل البوت الآخر، فقد لا تعمل مع كل البوتات —
-// لذلك أمر /استلام-تذكرة اليدوي هو الطريقة الأكيدة دائماً.
 module.exports = {
   name: 'messageCreate',
   async execute(message, client) {
@@ -31,8 +26,7 @@ module.exports = {
     const staff = getStaff(db, mention.id);
     staff.points += db.settings.ticketClaimPoints;
     staff.ticketsHandled += 1;
+    logPointEvent(db, { type: 'ticket', userId: mention.id, amount: db.settings.ticketClaimPoints, channelId: message.channel.id });
     writeDb(db);
-
-    sendLog(client, '🔗 استلام تذكرة (بوت خارجي)', `تم رصد استلام تذكرة بواسطة <@${mention.id}> عبر بوت آخر (+${db.settings.ticketClaimPoints} نقطة).`);
   }
 };
