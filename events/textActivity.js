@@ -1,4 +1,4 @@
-const { readDb, writeDb, getStaff } = require('../utils/db');
+const { readDb, writeDb, getStaff, logPointEvent } = require('../utils/db');
 
 module.exports = {
   name: 'messageCreate',
@@ -21,8 +21,10 @@ module.exports = {
 
     db.lastTextPoint[userId] = now;
     const staff = getStaff(db, userId);
-    staff.points += db.settings.textPointsPerMessage || 1;
+    const amount = db.settings.textPointsPerMessage || 1;
+    staff.points += amount;
     staff.textMessages += 1;
+    logPointEvent(db, { type: 'text', userId, amount });
     writeDb(db);
   }
 };
