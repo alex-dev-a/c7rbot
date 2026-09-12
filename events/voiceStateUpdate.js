@@ -1,9 +1,8 @@
-const { readDb, writeDb, getStaff } = require('../utils/db');
-const { sendLog } = require('../utils/logger');
+const { readDb, writeDb, getStaff, logPointEvent, logVoiceSession } = require('../utils/db');
 
 module.exports = {
   name: 'voiceStateUpdate',
-  async execute(oldState, newState, client) {
+  async execute(oldState, newState) {
     const db = readDb();
     const staffRoleId = db.settings.staffRoleId;
     if (!staffRoleId) return;
@@ -29,14 +28,14 @@ module.exports = {
         delete db.voiceSessions[userId];
         const staff = getStaff(db, userId);
         staff.voiceSeconds += seconds;
+        logVoiceSession(db, userId, seconds);
         const intervalSeconds = (db.settings.voiceIntervalMinutes || 10) * 60;
         const pointsEarned = Math.floor(seconds / intervalSeconds) * (db.settings.voicePointsPerInterval || 1);
-        staff.points += pointsEarned;
-        writeDb(db);
         if (pointsEarned > 0) {
-          const mins = Math.floor(seconds / 60);
-          sendLog(client, '🔊 نشاط صوتي', `<@${userId}> قضى ${mins} دقيقة بالروم الصوتي وحصل على ${pointsEarned} نقطة.`);
+          staff.points += pointsEarned;
+          logPointEvent(db, { type: 'voice', userId, amount: pointsEarned });
         }
+        writeDb(db);
       }
       return;
     }
