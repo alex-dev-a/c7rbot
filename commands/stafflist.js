@@ -31,11 +31,8 @@ module.exports = {
         .setTitle(`📋 قائمة الإدارة الكاملة${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}`)
         .setDescription(desc);
 
-      if (i === 0) {
-        await interaction.reply({ embeds: [embed] });
-      } else {
-        await interaction.followUp({ embeds: [embed] });
-      }
+      if (i === 0) await interaction.reply({ embeds: [embed] });
+      else await interaction.followUp({ embeds: [embed] });
     }
   }
 };
