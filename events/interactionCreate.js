@@ -2,38 +2,36 @@ const {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ModalBuilder, TextInputBuilder, TextInputStyle
 } = require('discord.js');
-const { readDb, writeDb, getStaff } = require('../utils/db');
-const { sendLog } = require('../utils/logger');
+const { readDb, writeDb, getStaff, logPointEvent } = require('../utils/db');
 
 async function handleButton(interaction, client) {
   const db = readDb();
 
-  if (interaction.customId === 'duty_checkin') {
-    if (db.activeSessions[interaction.user.id]) {
-      return interaction.reply({ content: 'أنت بالفعل في مناوبة نشطة.', ephemeral: true });
+  if (interaction.customId === 'checkin') {
+    if (db.checkedIn[interaction.user.id]) {
+      return interaction.reply({ content: 'أنت مسجّل دخول بالفعل.', ephemeral: true });
     }
-    db.activeSessions[interaction.user.id] = Date.now();
+    db.checkedIn[interaction.user.id] = true;
+    const staff = getStaff(db, interaction.user.id);
+    const amount = db.settings.checkinPoints || 0;
+    staff.points += amount;
+    logPointEvent(db, { type: 'checkin', userId: interaction.user.id, amount });
     writeDb(db);
-    await interaction.reply({ content: '🟢 بدأت مناوبتك، تم تسجيل الوقت.', ephemeral: true });
-    sendLog(client, '🟢 بدء مناوبة', `<@${interaction.user.id}> بدأ مناوبة إدارية.`);
+    await interaction.reply({ content: `🟢 تم تسجيل دخولك (+${amount} نقطة).`, ephemeral: true });
     return;
   }
 
-  if (interaction.customId === 'duty_checkout') {
-    const start = db.activeSessions[interaction.user.id];
-    if (!start) {
-      return interaction.reply({ content: 'ما عندك مناوبة نشطة حالياً.', ephemeral: true });
+  if (interaction.customId === 'checkout') {
+    if (!db.checkedIn[interaction.user.id]) {
+      return interaction.reply({ content: 'أنت غير مسجّل دخول حالياً.', ephemeral: true });
     }
-    const seconds = Math.floor((Date.now() - start) / 1000);
-    delete db.activeSessions[interaction.user.id];
+    delete db.checkedIn[interaction.user.id];
     const staff = getStaff(db, interaction.user.id);
-    staff.dutySeconds += seconds;
-    const pointsEarned = Math.floor((seconds / 3600) * db.settings.dutyPointsPerHour);
-    staff.points += pointsEarned;
+    const amount = db.settings.checkoutPoints || 0;
+    staff.points += amount;
+    logPointEvent(db, { type: 'checkout', userId: interaction.user.id, amount });
     writeDb(db);
-    const hrs = Math.floor(seconds / 3600), mins = Math.floor((seconds % 3600) / 60);
-    await interaction.reply({ content: `🔴 انتهت مناوبتك (${hrs}س ${mins}د). حصلت على ${pointsEarned} نقطة.`, ephemeral: true });
-    sendLog(client, '🔴 إنهاء مناوبة', `<@${interaction.user.id}> أنهى مناوبته بعد ${hrs}س ${mins}د وحصل على ${pointsEarned} نقطة.`);
+    await interaction.reply({ content: `🔴 تم تسجيل خروجك (+${amount} نقطة).`, ephemeral: true });
     return;
   }
 
@@ -45,7 +43,6 @@ async function handleButton(interaction, client) {
     db.activeTickets[interaction.channel.id][interaction.user.id] = Date.now();
     writeDb(db);
     await interaction.reply({ content: `✅ استلم <@${interaction.user.id}> هذه المهمة.` });
-    sendLog(client, '📥 استلام تذكرة', `<@${interaction.user.id}> استلم مهمة في <#${interaction.channel.id}>.`);
     return;
   }
 
@@ -57,20 +54,50 @@ async function handleButton(interaction, client) {
     }
     delete db.activeTickets[interaction.channel.id][interaction.user.id];
     const staff = getStaff(db, interaction.user.id);
-    staff.points += db.settings.ticketClaimPoints;
+    const amount = db.settings.ticketClaimPoints;
+    staff.points += amount;
     staff.ticketsHandled += 1;
+    logPointEvent(db, { type: 'ticket', userId: interaction.user.id, amount, channelId: interaction.channel.id });
     writeDb(db);
-    await interaction.reply({ content: `🏁 أنهى <@${interaction.user.id}> هذه المهمة وحصل على ${db.settings.ticketClaimPoints} نقطة.` });
-    sendLog(client, '📤 إنهاء تذكرة', `<@${interaction.user.id}> أنهى المهمة في <#${interaction.channel.id}> (+${db.settings.ticketClaimPoints} نقطة).`);
+    await interaction.reply({ content: `🏁 أنهى <@${interaction.user.id}> هذه المهمة وحصل على ${amount} نقطة.` });
     return;
   }
 
-  if (interaction.customId === 'apply_open') {
-    const modal = new ModalBuilder().setCustomId('apply_modal').setTitle('استمارة تقديم C7R');
-    const nameInput = new TextInputBuilder().setCustomId('apply_name').setLabel('اسمك داخل ديسكورد').setStyle(TextInputStyle.Short).setRequired(true);
-    const ageInput = new TextInputBuilder().setCustomId('apply_age').setLabel('عمرك').setStyle(TextInputStyle.Short).setRequired(true);
-    const whyInput = new TextInputBuilder().setCustomId('apply_why').setLabel('ليش تبي تنضم لفريق الإدارة؟').setStyle(TextInputStyle.Paragraph).setRequired(true);
-    const expInput = new TextInputBuilder().setCustomId('apply_exp').setLabel('خبرتك السابقة (إن وجدت)').setStyle(TextInputStyle.Paragraph).setRequired(false);
+  if (interaction.customId === 'ticket_autoclaim') {
+    const channelId = interaction.channel.id;
+    if (db.ticketClaims[channelId]) {
+      return interaction.reply({ content: `⚠️ تم استلام هذه التذكرة مسبقاً بواسطة <@${db.ticketClaims[channelId]}>.`, ephemeral: true });
+    }
+    if (db.settings.staffRoleId && !interaction.member.roles.cache.has(db.settings.staffRoleId)) {
+      return interaction.reply({ content: '⚠️ هذا الزر مخصص لأعضاء الإدارة فقط.', ephemeral: true });
+    }
+    db.ticketClaims[channelId] = interaction.user.id;
+    const staff = getStaff(db, interaction.user.id);
+    const amount = db.settings.ticketClaimPoints;
+    staff.points += amount;
+    staff.ticketsHandled += 1;
+    logPointEvent(db, { type: 'ticket', userId: interaction.user.id, amount, channelId });
+    writeDb(db);
+
+    const disabledRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('ticket_autoclaim_done').setLabel(`تم الاستلام بواسطة ${interaction.user.username}`).setStyle(ButtonStyle.Secondary).setDisabled(true)
+    );
+    await interaction.update({ components: [disabledRow] });
+    await interaction.channel.send(`✅ <@${interaction.user.id}> استلم هذه التذكرة (+${amount} نقطة).`).catch(() => {});
+    return;
+  }
+
+  if (interaction.customId.startsWith('apply_open_')) {
+    const key = interaction.customId.slice('apply_open_'.length);
+    const type = db.settings.applicationTypes[key];
+    if (!type) {
+      return interaction.reply({ content: '⚠️ نوع التقديم هذا لم يعد متاحاً.', ephemeral: true });
+    }
+    const modal = new ModalBuilder().setCustomId(`apply_modal_${key}`).setTitle(`تقديم — ${type.name}`.slice(0, 45));
+    const nameInput = new TextInputBuilder().setCustomId('apply_name').setLabel('اسمك داخل ديسكورد / Your Discord name').setStyle(TextInputStyle.Short).setRequired(true);
+    const ageInput = new TextInputBuilder().setCustomId('apply_age').setLabel('عمرك / Your age').setStyle(TextInputStyle.Short).setRequired(true);
+    const whyInput = new TextInputBuilder().setCustomId('apply_why').setLabel('سبب التقديم / Why are you applying?').setStyle(TextInputStyle.Paragraph).setRequired(true);
+    const expInput = new TextInputBuilder().setCustomId('apply_exp').setLabel('خبرتك السابقة / Previous experience').setStyle(TextInputStyle.Paragraph).setRequired(false);
     modal.addComponents(
       new ActionRowBuilder().addComponents(nameInput),
       new ActionRowBuilder().addComponents(ageInput),
@@ -93,7 +120,7 @@ async function handleButton(interaction, client) {
     if (app.status !== 'pending') {
       const statusText = app.status === 'accepted' ? 'مقبول' : 'مرفوض';
       return interaction.reply({
-        content: `⚠️ تمت معالجة هذا الطلب مسبقاً من قبل <@${app.decidedBy}> (${statusText}). لا يمكن تعديله مرة أخرى.`,
+        content: `⚠️ تمت معالجة هذا الطلب مسبقاً من قبل <@${app.decidedBy}> (${statusText}).`,
         ephemeral: true
       });
     }
@@ -110,8 +137,8 @@ async function handleButton(interaction, client) {
     const originalEmbed = interaction.message.embeds[0];
     const updatedEmbed = originalEmbed
       ? EmbedBuilder.from(originalEmbed).addFields({
-          name: 'الحالة',
-          value: `${isAccept ? '✅ مقبول' : '❌ مرفوض'} بواسطة <@${interaction.user.id}>`
+          name: 'الحالة / Status',
+          value: `${isAccept ? '✅ مقبول / Accepted' : '❌ مرفوض / Rejected'} — <@${interaction.user.id}>`
         })
       : null;
 
@@ -120,12 +147,11 @@ async function handleButton(interaction, client) {
       components: [disabledRow]
     });
 
-    sendLog(client, isAccept ? '✅ قبول تقديم' : '❌ رفض تقديم', `طلب <@${app.userId}> تمت مراجعته (${isAccept ? 'قبول' : 'رفض'}) بواسطة <@${interaction.user.id}>.`);
     const user = await client.users.fetch(app.userId).catch(() => null);
     if (user) {
       user.send(isAccept
-        ? '🎉 تم قبول طلب تقديمك في فريق إدارة C7R! تواصل مع الإدارة للخطوات التالية.'
-        : '❌ نأسف، تم رفض طلب تقديمك في فريق إدارة C7R حالياً.'
+        ? `🎉 تم قبول طلب تقديمك! تواصل مع الإدارة للخطوات التالية.\n🎉 Your application has been accepted! Contact the staff for next steps.`
+        : `❌ نأسف، تم رفض طلب تقديمك حالياً.\n❌ Sorry, your application has been rejected for now.`
       ).catch(() => {});
     }
     return;
@@ -133,32 +159,36 @@ async function handleButton(interaction, client) {
 }
 
 async function handleModal(interaction, client) {
-  if (interaction.customId === 'apply_modal') {
+  const db = readDb();
+
+  if (interaction.customId.startsWith('apply_modal_')) {
+    const key = interaction.customId.slice('apply_modal_'.length);
+    const type = db.settings.applicationTypes[key];
+    if (!type) {
+      return interaction.reply({ content: '⚠️ نوع التقديم هذا لم يعد متاحاً.', ephemeral: true });
+    }
+
     const name = interaction.fields.getTextInputValue('apply_name');
     const age = interaction.fields.getTextInputValue('apply_age');
     const why = interaction.fields.getTextInputValue('apply_why');
-    const exp = interaction.fields.getTextInputValue('apply_exp') || 'لا يوجد';
-    const db = readDb();
-    const reviewChannelId = db.settings.reviewChannelId;
-    if (!reviewChannelId) {
-      return interaction.reply({ content: '⚠️ لم يتم إعداد قناة مراجعة الطلبات بعد. أخبر الإدارة.', ephemeral: true });
-    }
-    const channel = await client.channels.fetch(reviewChannelId).catch(() => null);
+    const exp = interaction.fields.getTextInputValue('apply_exp') || 'لا يوجد / None';
+
+    const channel = await client.channels.fetch(type.channelId).catch(() => null);
 
     const appId = `${interaction.user.id}_${Date.now()}`;
-    db.applications[appId] = { userId: interaction.user.id, status: 'pending' };
+    db.applications[appId] = { userId: interaction.user.id, status: 'pending', type: key };
     writeDb(db);
 
     if (channel) {
       const embed = new EmbedBuilder()
         .setColor(0xA855F7)
-        .setTitle('📋 طلب تقديم جديد')
+        .setTitle(`📋 طلب تقديم جديد — ${type.name} / New Application`)
         .addFields(
-          { name: 'المتقدم', value: `<@${interaction.user.id}>` },
-          { name: 'الاسم', value: name },
-          { name: 'العمر', value: age },
-          { name: 'سبب التقديم', value: why },
-          { name: 'الخبرة', value: exp }
+          { name: 'المتقدم / Applicant', value: `<@${interaction.user.id}>` },
+          { name: 'الاسم / Name', value: name },
+          { name: 'العمر / Age', value: age },
+          { name: 'سبب التقديم / Reason', value: why },
+          { name: 'الخبرة / Experience', value: exp }
         )
         .setTimestamp();
       const row = new ActionRowBuilder().addComponents(
@@ -167,21 +197,33 @@ async function handleModal(interaction, client) {
       );
       await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
     }
-    await interaction.reply({ content: '✅ تم إرسال طلبك بنجاح، سيتم مراجعته قريباً.', ephemeral: true });
+    await interaction.reply({ content: '✅ تم إرسال طلبك بنجاح، سيتم مراجعته قريباً.\n✅ Your application has been submitted.', ephemeral: true });
     return;
   }
 
   if (interaction.customId === 'report_modal') {
     const subject = interaction.fields.getTextInputValue('report_subject');
     const details = interaction.fields.getTextInputValue('report_details');
-    const db = readDb();
     const staff = getStaff(db, interaction.user.id);
     staff.reports += 1;
     writeDb(db);
-    sendLog(client, '📝 تقرير جديد', `تقرير من <@${interaction.user.id}>`, [
-      { name: 'الموضوع', value: subject },
-      { name: 'التفاصيل', value: details }
-    ]);
+
+    const channelId = db.settings.reportsChannelId;
+    if (channelId) {
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+      if (channel) {
+        const embed = new EmbedBuilder()
+          .setColor(0xA855F7)
+          .setTitle('📝 تقرير إداري جديد')
+          .addFields(
+            { name: 'المرسل', value: `<@${interaction.user.id}>` },
+            { name: 'العنوان', value: subject },
+            { name: 'التفاصيل', value: details }
+          )
+          .setTimestamp();
+        await channel.send({ embeds: [embed] }).catch(() => {});
+      }
+    }
     await interaction.reply({ content: '✅ تم إرسال تقريرك بنجاح.', ephemeral: true });
     return;
   }
@@ -201,7 +243,7 @@ module.exports = {
         try {
           if (interaction.replied || interaction.deferred) await interaction.followUp(reply);
           else await interaction.reply(reply);
-        } catch (_) { /* تجاهل أي خطأ إضافي بالرد نفسه */ }
+        } catch (_) { /* تجاهل */ }
       }
       return;
     }
