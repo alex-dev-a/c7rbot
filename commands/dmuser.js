@@ -13,7 +13,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(0xA855F7)
-      .setTitle('📩 رسالة من إدارة C7R')
+      .setTitle('C7R E-SPORTS')
       .setDescription(text)
       .setFooter({ text: `أُرسلت بواسطة ${interaction.user.username}` })
       .setTimestamp();
