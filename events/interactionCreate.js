@@ -2,36 +2,38 @@ const {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ModalBuilder, TextInputBuilder, TextInputStyle
 } = require('discord.js');
-const { readDb, writeDb, getStaff, logPointEvent } = require('../utils/db');
+const { readDb, writeDb, getStaff, logPointEvent, todayKeyUTC } = require('../utils/db');
 
 async function handleButton(interaction, client) {
   const db = readDb();
 
   if (interaction.customId === 'checkin') {
-    if (db.checkedIn[interaction.user.id]) {
-      return interaction.reply({ content: 'أنت مسجّل دخول بالفعل.', ephemeral: true });
+    const today = todayKeyUTC();
+    if (db.lastCheckin[interaction.user.id] === today) {
+      return interaction.reply({ content: 'أنت سجّلت دخولك اليوم بالفعل. حاول مرة ثانية بكرة.', ephemeral: true });
     }
-    db.checkedIn[interaction.user.id] = true;
+    db.lastCheckin[interaction.user.id] = today;
     const staff = getStaff(db, interaction.user.id);
     const amount = db.settings.checkinPoints || 0;
     staff.points += amount;
     logPointEvent(db, { type: 'checkin', userId: interaction.user.id, amount });
     writeDb(db);
-    await interaction.reply({ content: `🟢 تم تسجيل دخولك (+${amount} نقطة).`, ephemeral: true });
+    await interaction.reply({ content: `🟢 تم تسجيل دخولك لليوم (+${amount} نقطة).`, ephemeral: true });
     return;
   }
 
   if (interaction.customId === 'checkout') {
-    if (!db.checkedIn[interaction.user.id]) {
-      return interaction.reply({ content: 'أنت غير مسجّل دخول حالياً.', ephemeral: true });
+    const today = todayKeyUTC();
+    if (db.lastCheckout[interaction.user.id] === today) {
+      return interaction.reply({ content: 'أنت سجّلت خروجك اليوم بالفعل. حاول مرة ثانية بكرة.', ephemeral: true });
     }
-    delete db.checkedIn[interaction.user.id];
+    db.lastCheckout[interaction.user.id] = today;
     const staff = getStaff(db, interaction.user.id);
     const amount = db.settings.checkoutPoints || 0;
     staff.points += amount;
     logPointEvent(db, { type: 'checkout', userId: interaction.user.id, amount });
     writeDb(db);
-    await interaction.reply({ content: `🔴 تم تسجيل خروجك (+${amount} نقطة).`, ephemeral: true });
+    await interaction.reply({ content: `🔴 تم تسجيل خروجك لليوم (+${amount} نقطة).`, ephemeral: true });
     return;
   }
 
