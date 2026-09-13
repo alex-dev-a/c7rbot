@@ -165,4 +165,33 @@
   },
   {
     "name": "توب-الاسبوع",
-    "description": "متصدرو النقاط والتواجد الص
+    "description": "متصدرو النقاط والتواجد الصوتي خلال آخر 7 أيام"
+  },
+  {
+    "name": "ارسال-امبد",
+    "description": "إرسال إمبد مخصص لأي قناة تختارها",
+    "default_member_permissions": "32",
+    "options": [
+      { "type": 7, "name": "قناة", "description": "القناة المستهدفة", "required": true },
+      { "type": 3, "name": "وصف", "description": "نص الإمبد", "required": true },
+      { "type": 3, "name": "عنوان", "description": "عنوان الإمبد (اختياري)", "required": false },
+      {
+        "type": 3, "name": "لون", "description": "لون الإمبد", "required": false,
+        "choices": [
+          { "name": "بنفسجي", "value": "بنفسجي" },
+          { "name": "أحمر", "value": "أحمر" },
+          { "name": "أخضر", "value": "أخضر" },
+          { "name": "أزرق", "value": "أزرق" },
+          { "name": "أصفر", "value": "أصفر" },
+          { "name": "أسود", "value": "أسود" }
+        ]
+      },
+      { "type": 3, "name": "صورة", "description": "رابط صورة تظهر أسفل الإمبد (اختياري)", "required": false },
+      { "type": 3, "name": "تذييل", "description": "نص أسفل الإمبد (اختياري)", "required": false }
+    ]
+  },
+  {
+    "name": "help",
+    "description": "نبذة عن السيرفر وكل أوامر ومميزات C7R BOT"
+  }
+]
