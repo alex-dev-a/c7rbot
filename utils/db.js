@@ -30,7 +30,8 @@ function defaultData() {
     voiceSessions: {},
     lastTextPoint: {},
     applications: {},
-    checkedIn: {},
+    lastCheckin: {},
+    lastCheckout: {},
     pointEvents: [],
     voiceLog: [],
     lastDailyReportDate: null
@@ -93,6 +94,11 @@ function pruneOldEvents(db) {
   db.voiceLog = db.voiceLog.filter(e => e.ts >= cutoff);
 }
 
+function todayKeyUTC() {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+}
+
 module.exports = {
-  readDb, writeDb, getStaff, logPointEvent, logVoiceSession, pruneOldEvents, DB_PATH
+  readDb, writeDb, getStaff, logPointEvent, logVoiceSession, pruneOldEvents, todayKeyUTC, DB_PATH
 };
